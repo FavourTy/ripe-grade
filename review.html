@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ripe &amp; Grade: Review</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#2C6B3C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap wide">
+    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Ripe &amp; Grade</h1></a>
+    <nav class="toplinks"><a href="./">Public page</a><a href="trusted.html">Team upload</a></nav>
+  </div>
+</header>
+
+<main class="wrap wide">
+  <section class="intro"><h2>Review samples</h2><p>Approve good samples, reject unusable ones, and set the final label. Only approved samples go into the training dataset.</p></section>
+  <div id="auth"></div>
+
+  <section id="app" hidden style="margin-top:14px">
+    <div class="filters">
+      <select id="fStatus" aria-label="Status"><option value="pending">Waiting for review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="">All statuses</option></select>
+      <select id="fSource" aria-label="Source"><option value="">Crowd and trusted</option><option value="crowd">Crowd only</option><option value="trusted">Trusted only</option></select>
+      <select id="fCrop" aria-label="Produce"><option value="">All produce</option><option value="beans">Beans</option><option value="banana">Banana</option><option value="plantain">Plantain</option><option value="pawpaw">Pawpaw</option></select>
+      <span class="hint" id="count"></span>
+      <span style="margin-left:auto;display:flex;gap:8px;align-items:center"><span class="status-line" id="exportStatus"></span><button type="button" id="exportBtn">Export CSV</button></span>
+    </div>
+    <div class="cards" id="cards"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:center"><button type="button" id="moreBtn" hidden>Load more</button></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/auth.js"></script>
+<script>
+(function () {
+  "use strict";
+  var RG = window.RG, $ = RG.$, el = RG.el, me = null;
+  var PAGE = 30, offset = 0, total = 0;
+  var GRADES = [["A", "A"], ["B", "B"], ["C", "C"], ["reject", "Reject"], ["unsure", "Not sure"]];
+
+  RG.requireTeam($("auth"), function (info) {
+    me = info;
+    if (info.role !== "admin") { $("auth").appendChild(el("div", { class: "notice warn", style: "margin-top:10px", text: "Only admins can review samples." })); return; }
+    $("app").hidden = false;
+    reload();
+  });
+  ["fStatus", "fSource", "fCrop"].forEach(function (id) { $(id).addEventListener("change", reload); });
+  $("moreBtn").addEventListener("click", function () { load(false); });
+
+  function query(sel, opts) {
+    var q = RG.sb.from("samples").select(sel, opts);
+    if ($("fStatus").value) q = q.eq("review_status", $("fStatus").value);
+    if ($("fSource").value) q = q.eq("source", $("fSource").value);
+    if ($("fCrop").value) q = q.eq("crop", $("fCrop").value);
+    return q.order("created_at", { ascending: false });
+  }
+  function reload() { offset = 0; $("cards").innerHTML = ""; load(true); }
+  function load(first) {
+    $("moreBtn").disabled = true;
+    query("*", { count: "exact" }).range(offset, offset + PAGE - 1).then(function (r) {
+      $("moreBtn").disabled = false;
+      if (r.error) { $("cards").appendChild(el("div", { class: "notice bad", text: RG.errorText(r.error) })); return; }
+      total = r.count || 0; offset += r.data.length;
+      $("count").textContent = total + (total === 1 ? " sample" : " samples");
+      if (first && !r.data.length) $("cards").appendChild(el("div", { class: "empty", text: "No samples match these filters." }));
+      var paths = [];
+      r.data.forEach(function (s) { (s.photos || []).slice(0, 4).forEach(function (p) { paths.push(p.path); }); });
+      var urls = {};
+      var getUrls = paths.length ? RG.sb.storage.from(RG.BUCKET).createSignedUrls(paths, 3600).then(function (u) {
+        (u.data || []).forEach(function (x) { if (x.signedUrl) urls[x.path] = x.signedUrl; });
+      }) : Promise.resolve();
+      getUrls.then(function () { r.data.forEach(function (s) { $("cards").appendChild(card(s, urls)); }); });
+      $("moreBtn").hidden = offset >= total;
+    });
+  }
+
+  function card(s, urls) {
+    var pics = el("div", { class: "pics" });
+    (s.photos || []).slice(0, 4).forEach(function (p) {
+      var u = urls[p.path];
+      if (!u) { pics.appendChild(el("div", { class: "ph" })); return; }
+      pics.appendChild(el("a", { href: u, target: "_blank", rel: "noopener", title: p.view || "" }, [el("img", { src: u, alt: p.view || "Photo", loading: "lazy" })]));
+    });
+    if (!(s.photos || []).length) pics.appendChild(el("div", { class: "ph" }));
+
+    var fruit = s.crop !== "beans", rows = [];
+    function add(k, v) { if (v != null && v !== "" && !(Array.isArray(v) && !v.length)) rows.push(el("dt", { text: k }), el("dd", { text: Array.isArray(v) ? v.join(", ") : String(v) })); }
+    add("Ripeness", RG.stageName(s.ripeness));
+    add("Defects", s.defects);
+    if (s.source === "crowd") {
+      add("Got it from", RG.optionText(RG.SOURCES, s.obtained_from));
+      add("Seller said", RG.optionText(fruit ? RG.CLAIMS.fruit : RG.CLAIMS.beans, s.seller_claim));
+    } else {
+      add("Grade", s.grade); add("Damaged", s.damaged_pct != null ? s.damaged_pct + "%" : null);
+      add("Treatment", RG.optionText(fruit ? RG.TREATMENTS.fruit : RG.TREATMENTS.beans, s.treatment));
+      add("Hours since start", s.hours_since_start); add("Lab result", s.lab_result); add("Signs", s.signs);
+      add("Views", (s.photos || []).map(function (p) { return p.view; }).filter(Boolean));
+    }
+    add("Notes", s.notes); add("Review note", s.review_note);
+
+    var labelOpts = s.project === "chemical" ? (fruit ? RG.TREATMENTS.fruit : RG.TREATMENTS.beans) : GRADES;
+    var finalSel = el("select", { "aria-label": "Final label", id: "final-" + s.id });
+    finalSel.appendChild(el("option", { value: "", text: s.project === "chemical" ? "Final treatment label" : "Final grade (optional)" }));
+    var preset = s.final_label != null ? s.final_label : (s.project === "chemical" ? s.treatment : s.grade);
+    labelOpts.forEach(function (o) { var op = el("option", { value: o[0], text: o[1] }); if (o[0] === preset) op.selected = true; finalSel.appendChild(op); });
+    var note = el("input", { type: "text", placeholder: "Review note", "aria-label": "Review note", id: "note-" + s.id, maxlength: "300" });
+    note.value = s.review_note || "";
+    var msg = el("span", { class: "status-line" });
+    var pill = el("span", { class: "pill " + s.review_status, text: s.review_status === "pending" ? "waiting" : s.review_status });
+    var article;
+
+    function save(status) {
+      setBusy(true);
+      RG.sb.from("samples").update({ review_status: status, final_label: finalSel.value || null, review_note: note.value.trim() || null, reviewed_at: new Date().toISOString(), reviewed_by: me.user.id })
+        .eq("id", s.id).then(function (r) {
+          setBusy(false);
+          if (r.error) { msg.textContent = RG.errorText(r.error); return; }
+          s.review_status = status; pill.className = "pill " + status; pill.textContent = status;
+          msg.textContent = status === "approved" ? "Approved" : "Rejected";
+          delBtn.hidden = status !== "rejected";
+        });
+    }
+    var confirmDel = false;
+    function del() {
+      if (!confirmDel) { confirmDel = true; delBtn.textContent = "Tap again to delete for good"; setTimeout(function () { confirmDel = false; delBtn.textContent = "Delete"; }, 4000); return; }
+      setBusy(true);
+      var paths = (s.photos || []).map(function (p) { return p.path; });
+      (paths.length ? RG.sb.storage.from(RG.BUCKET).remove(paths) : Promise.resolve({}))
+        .then(function () { return RG.sb.from("samples").delete().eq("id", s.id); })
+        .then(function (r) { if (r && r.error) throw r.error; article.remove(); total--; $("count").textContent = total + " samples"; })
+        .catch(function (err) { setBusy(false); msg.textContent = RG.errorText(err); });
+    }
+    var approveBtn = el("button", { type: "button", class: "small primary", text: "Approve", onclick: function () { save("approved"); } });
+    var rejectBtn = el("button", { type: "button", class: "small", text: "Reject", onclick: function () { save("rejected"); } });
+    var delBtn = el("button", { type: "button", class: "small", text: "Delete", onclick: del });
+    delBtn.hidden = s.review_status !== "rejected";
+    function setBusy(b) { [approveBtn, rejectBtn, delBtn].forEach(function (x) { x.disabled = b; }); }
+
+    article = el("article", { class: "rcard" }, [pics, el("div", { class: "body" }, [
+      el("div", { style: "display:flex;flex-wrap:wrap;gap:8px;align-items:center" }, [
+        el("h3", { style: "font-size:1.05rem", text: RG.LABEL[s.crop] + (s.project ? " · " + RG.LABEL[s.project] : "") }),
+        el("span", { class: "pill " + s.source, text: s.source }), pill,
+        s.sample_tag ? el("span", { class: "mono", text: s.sample_tag }) : null
+      ]),
+      el("div", { class: "meta" }, [
+        el("span", { text: RG.fmtDate(s.created_at) }),
+        el("span", { text: [s.place, s.town].filter(Boolean).join(", ") || "No location" }),
+        s.contributor ? el("span", { text: "By " + s.contributor }) : null,
+        s.phone_model ? el("span", { text: s.phone_model }) : null,
+        el("span", { text: (s.photos || []).length + " photos" })
+      ]),
+      el("dl", { class: "facts" }, rows),
+      el("div", { class: "revrow" }, [finalSel, note, approveBtn, rejectBtn, delBtn, msg])
+    ])]);
+    return article;
+  }
+
+  // ---- export ----
+  function csvCell(v) { if (v == null) return ""; if (Array.isArray(v)) v = v.join("; "); else if (typeof v === "object") v = JSON.stringify(v); v = String(v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  $("exportBtn").addEventListener("click", function () {
+    var es = $("exportStatus"); es.textContent = "Preparing…"; $("exportBtn").disabled = true;
+    var cols = ["id", "created_at", "source", "project", "crop", "review_status", "final_label", "ripeness", "defects", "obtained_from", "seller_claim", "grade", "damaged_pct", "treatment", "hours_since_start", "lab_result", "signs", "sample_tag", "taken_at", "place", "town", "phone_model", "contributor", "notes", "review_note"];
+    var all = [], from = 0;
+    function page() {
+      return query("*").range(from, from + 999).then(function (r) {
+        if (r.error) throw r.error;
+        all = all.concat(r.data); from += r.data.length;
+        if (r.data.length === 1000) return page();
+      });
+    }
+    page().then(function () {
+      var lines = [cols.concat(["photo_paths", "photo_views"]).join(",")];
+      all.forEach(function (s) {
+        var ph = s.photos || [];
+        lines.push(cols.map(function (c) { return csvCell(s[c]); }).concat([csvCell(ph.map(function (p) { return p.path; })), csvCell(ph.map(function (p) { return p.view || ""; }))]).join(","));
+      });
+      var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      var d = new Date(), a = el("a", { href: URL.createObjectURL(blob), download: "ripe-grade-" + d.getFullYear() + RG.pad(d.getMonth() + 1) + RG.pad(d.getDate()) + ".csv" });
+      document.body.appendChild(a); a.click(); a.remove();
+      es.textContent = all.length + " rows exported";
+    }).catch(function (err) { es.textContent = RG.errorText(err); })
+    .then(function () { $("exportBtn").disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>

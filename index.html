@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ripe &amp; Grade: Share Produce Photos</title>
+<meta name="description" content="Help build Nigeria's first open photo dataset of beans, banana, plantain and pawpaw. Snap a photo, tap a few answers, done.">
+<meta name="theme-color" content="#2C6B3C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Ripe &amp; Grade</h1></a>
+    <nav class="toplinks"><a href="#leaderboard">Top helpers</a><a href="#how">How to shoot</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro">
+    <h2>Snap beans, banana, plantain or pawpaw. Help Nigerian AI research.</h2>
+    <p>We're building an open photo dataset so a phone can one day check produce quality and spot chemically ripened fruit. One sample takes about 30 seconds.</p>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <div id="setupNote" hidden></div>
+  <div id="doneBox" class="notice ok" hidden style="margin-bottom:14px">
+    <h3 id="doneTitle" style="font-size:1.15rem">Uploaded. Thank you!</h3>
+    <p id="doneText" style="margin:6px 0 12px"></p>
+    <button type="button" class="primary" id="againBtn">Add another sample</button>
+  </div>
+
+  <form class="flow" id="form" novalidate>
+    <div class="card-step">
+      <fieldset>
+        <legend><span class="step-no">1</span>Take photos of one sample</legend>
+        <p class="hint" id="photoHint">Put the produce on a plain light background. Take 1 to 4 photos from different sides.</p>
+        <div class="photo-actions">
+          <label class="btn primary" for="camIn">Take photo</label>
+          <input type="file" id="camIn" accept="image/*" capture="environment">
+          <label class="btn" for="galIn">Choose from gallery</label>
+          <input type="file" id="galIn" accept="image/*" multiple>
+        </div>
+        <div class="thumbs" id="thumbs"></div>
+      </fieldset>
+    </div>
+
+    <div class="card-step">
+      <fieldset>
+        <legend><span class="step-no">2</span>What is it?</legend>
+        <div class="tiles four" id="cropTiles"></div>
+      </fieldset>
+    </div>
+
+    <div class="card-step" id="ripeStep">
+      <fieldset>
+        <legend><span class="step-no">3</span>How ripe does it look?</legend>
+        <div class="ripeness" id="ripeness"></div>
+      </fieldset>
+    </div>
+
+    <div class="card-step">
+      <fieldset>
+        <legend><span class="step-no" id="probNo">4</span>Any problems you can see? <span class="optional">Tick all that apply</span></legend>
+        <div class="chips" id="defects"></div>
+      </fieldset>
+    </div>
+
+    <div class="card-step">
+      <fieldset>
+        <legend><span class="step-no" id="srcNo">5</span>Where did you get it?</legend>
+        <div class="chips" id="sources"></div>
+      </fieldset>
+      <fieldset>
+        <legend class="lbl" id="claimLegend">Did the seller say how it was ripened?</legend>
+        <div class="chips" id="claims"></div>
+        <p class="hint">It's fine if you don't know. Just tell us what you heard.</p>
+      </fieldset>
+    </div>
+
+    <div class="card-step">
+      <div class="row">
+        <div class="field"><label for="town">Town or city <span class="optional">(optional)</span></label><input type="text" id="town" maxlength="80" placeholder="Ibadan" autocomplete="address-level2"></div>
+        <div class="field"><label for="nick">Your name or nickname for credit <span class="optional">(optional)</span></label><input type="text" id="nick" maxlength="40" placeholder="Tolu from UI" autocomplete="nickname"></div>
+      </div>
+      <label class="consent" for="consent">
+        <input type="checkbox" id="consent">
+        <span>I took these photos myself, no faces are visible, and I agree they can be shared in an open research dataset. My nickname may appear on the top helpers list.</span>
+      </label>
+      <button type="submit" class="primary big" id="submitBtn">Upload sample</button>
+      <div class="progress" id="progress" hidden><i id="bar"></i></div>
+      <div class="status-line" id="status" role="status" aria-live="polite"></div>
+    </div>
+  </form>
+
+  <section id="how" style="margin-top:28px">
+    <details class="help" open>
+      <summary>How to take good photos</summary>
+      <ul>
+        <li>Use a plain white or light background: a plate, tray, paper or white cloth.</li>
+        <li>Shoot in daylight or shade. No flash. Avoid yellow bulbs.</li>
+        <li><b>Beans:</b> spread one layer on a tray and shoot straight down.</li>
+        <li><b>Fruit:</b> one photo from the side, one from above, one close-up of the stalk or stem.</li>
+        <li>Keep faces out of the photo.</li>
+      </ul>
+    </details>
+  </section>
+
+  <section id="leaderboard" style="margin-top:28px;display:grid;gap:10px">
+    <h2 style="font-size:1.3rem">Top helpers</h2>
+    <p class="hint" id="mine"></p>
+    <ol class="board" id="board"><li><span>Loading…</span></li></ol>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">Photos are stored privately and reviewed before release. Locations are kept at town level. Research team: <a href="trusted.html">team sign-in</a>.</div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script>
+(function () {
+  "use strict";
+  var RG = window.RG, $ = RG.$, el = RG.el;
+
+  // ---- build controls ----
+  RG.CROPS.forEach(function (c, i) {
+    $("cropTiles").appendChild(el("label", { for: "crop-" + c[0] }, [
+      el("input", { type: "radio", name: "crop", value: c[0], id: "crop-" + c[0] }),
+      el("span", { text: c[1] })
+    ]));
+  });
+  RG.buildRipeness($("ripeness"), "ripe");
+  RG.buildChips($("sources"), RG.SOURCES, "src", "radio", "source");
+
+  var picker = RG.photoPicker({ box: $("thumbs"), inputs: [$("camIn"), $("galIn")], max: 4 });
+
+  function crop() { return RG.radio("crop"); }
+  function refresh() {
+    var c = crop(), fruit = c && c !== "beans";
+    $("ripeStep").hidden = !fruit;
+    $("probNo").textContent = fruit ? "4" : "3";
+    $("srcNo").textContent = fruit ? "5" : "4";
+    RG.buildChips($("defects"), (fruit || !c ? RG.DEFECTS.fruit : RG.DEFECTS.beans).concat(["None I can see"]), "def");
+    RG.buildChips($("claims"), c === "beans" ? RG.CLAIMS.beans : RG.CLAIMS.fruit, "clm", "radio", "claim");
+    $("claimLegend").textContent = c === "beans" ? "Did the seller say if the beans were treated with a chemical?" : "Did the seller say how it was ripened?";
+    $("photoHint").textContent = c === "beans"
+      ? "Spread one layer of beans on a plain light tray and shoot straight down. 1 to 4 photos."
+      : "Put the produce on a plain light background. Take 1 to 4 photos from different sides.";
+  }
+  document.querySelectorAll('input[name="crop"]').forEach(function (r) { r.addEventListener("change", refresh); });
+  refresh();
+
+  // remembered details
+  ["town", "nick"].forEach(function (k) { var v = RG.store("rg-" + k); if (v) $(k).value = v; });
+  function myCount() { return Number(RG.store("rg-count") || 0); }
+  function showMine() { var n = myCount(); $("mine").textContent = n ? "You've added " + n + (n === 1 ? " sample" : " samples") + " from this phone." : "Your uploads will count here."; }
+  showMine();
+
+  // ---- public numbers ----
+  function loadNumbers() {
+    if (!RG.sb) return;
+    RG.sb.rpc("public_stats").then(function (r) {
+      if (r.error || !r.data) return;
+      var s = r.data, box = $("stats"); box.innerHTML = "";
+      box.appendChild(el("span", {}, [el("b", { text: String(s.samples) }), " samples so far"]));
+      box.appendChild(el("span", { text: "Beans " + s.beans + " · Banana " + s.banana + " · Plantain " + s.plantain + " · Pawpaw " + s.pawpaw }));
+    });
+    RG.sb.rpc("leaderboard").then(function (r) {
+      var b = $("board"); b.innerHTML = "";
+      if (r.error || !r.data || !r.data.length) { b.appendChild(el("li", {}, [el("span", { text: "No named helpers yet. Add a nickname and be the first." })])); return; }
+      r.data.forEach(function (row) { b.appendChild(el("li", {}, [el("span", { text: row.contributor }), el("b", { text: String(row.uploads) })])); });
+    });
+  }
+
+  if (!RG.configured || !RG.sb) { RG.notConfiguredNote($("setupNote")); $("submitBtn").disabled = true; $("board").innerHTML = ""; }
+  else loadNumbers();
+
+  // ---- submit ----
+  var busy = false;
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (busy || !RG.sb) return;
+    var st = $("status"), c = crop(), fruit = c && c !== "beans";
+    if (!picker.photos.length) { st.textContent = "Add at least one photo first."; $("camIn").focus(); return; }
+    if (!c) { st.textContent = "Choose what the produce is."; return; }
+    if (fruit && !RG.radio("ripe")) { st.textContent = "Tap the colour that matches how ripe it looks."; return; }
+    if (!RG.radio("source")) { st.textContent = "Tell us where you got it."; return; }
+    if (!$("consent").checked) { st.textContent = "Tick the box to agree before uploading."; $("consent").focus(); return; }
+
+    busy = true; $("submitBtn").disabled = true; $("progress").hidden = false; $("bar").style.width = "4%";
+    st.textContent = "Uploading photos…";
+    var defects = RG.checked($("defects")).filter(function (d) { return d !== "None I can see"; });
+    RG.uploadPhotos(picker.photos, "crowd", function (done, total) {
+      $("bar").style.width = Math.round(done / total * 90) + "%";
+      st.textContent = "Uploaded " + done + " of " + total + " photos…";
+    }).then(function (photos) {
+      st.textContent = "Saving answers…";
+      return RG.sb.from("samples").insert({
+        source: "crowd",
+        crop: c,
+        photos: photos,
+        ripeness: fruit ? Number(RG.radio("ripe")) : null,
+        defects: defects,
+        obtained_from: RG.radio("source"),
+        seller_claim: RG.radio("claim") || null,
+        town: $("town").value.trim() || null,
+        contributor: $("nick").value.trim() || null,
+        device_id: RG.deviceId(),
+        consent: true
+      }).then(function (r) { if (r.error) throw r.error; return photos.length; });
+    }).then(function (n) {
+      $("bar").style.width = "100%";
+      RG.store("rg-town", $("town").value.trim());
+      RG.store("rg-nick", $("nick").value.trim());
+      RG.store("rg-count", String(myCount() + 1));
+      showMine(); loadNumbers();
+      $("doneText").textContent = "Your sample (" + n + (n === 1 ? " photo" : " photos") + ") is in. You've added " + myCount() + " from this phone. Got another one?";
+      $("doneBox").hidden = false; $("form").hidden = true; st.textContent = "";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }).catch(function (err) {
+      st.textContent = RG.errorText(err);
+    }).then(function () {
+      busy = false; $("submitBtn").disabled = false;
+      setTimeout(function () { $("progress").hidden = true; $("bar").style.width = "0"; }, 600);
+    });
+  });
+
+  $("againBtn").addEventListener("click", function () {
+    picker.clear();
+    ["ripe", "source", "claim"].forEach(function (n) { document.querySelectorAll('input[name="' + n + '"]').forEach(function (i) { i.checked = false; }); });
+    refresh();
+    $("consent").checked = false;
+    $("doneBox").hidden = true; $("form").hidden = false;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+})();
+</script>
+</body>
+</html>

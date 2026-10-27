@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ripe &amp; Grade: Team Upload</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#2C6B3C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Ripe &amp; Grade</h1></a>
+    <nav class="toplinks"><a href="./">Public page</a><a href="review.html" id="reviewLink" hidden>Review</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro">
+    <h2>Team upload</h2>
+    <p>For you and lab partners. Use this form for samples where you know the truth: controlled ripening batches, lab-tested beans, and graded trays.</p>
+  </section>
+  <div id="auth"></div>
+  <div id="doneNote" class="notice ok" hidden style="margin-top:14px"></div>
+
+  <form class="flow" id="form" novalidate hidden style="margin-top:14px">
+    <div class="card-step">
+      <fieldset>
+        <legend><span class="step-no">1</span>Dataset</legend>
+        <div class="tiles">
+          <label for="p-grading"><input type="radio" name="project" value="grading" id="p-grading" checked><span>Sorting &amp; grading<small>Grade, defects, ripeness</small></span></label>
+          <label for="p-chemical"><input type="radio" name="project" value="chemical" id="p-chemical"><span>Chemical<small>Ripening agent or preservative</small></span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend><span class="step-no">2</span>Produce</legend>
+        <div class="tiles four" id="cropTiles"></div>
+      </fieldset>
+    </div>
+
+    <div class="card-step">
+      <fieldset>
+        <legend><span class="step-no">3</span>Photos <span class="optional">up to 8, set the view for each</span></legend>
+        <div class="photo-actions">
+          <label class="btn primary" for="camIn">Take photo</label>
+          <input type="file" id="camIn" accept="image/*" capture="environment">
+          <label class="btn" for="galIn">Choose from gallery</label>
+          <input type="file" id="galIn" accept="image/*" multiple>
+        </div>
+        <div class="thumbs" id="thumbs"></div>
+      </fieldset>
+    </div>
+
+    <div class="card-step">
+      <fieldset>
+        <legend><span class="step-no">4</span>Sample details</legend>
+        <div class="row">
+          <div class="field">
+            <label for="tag">Sample tag (on paper in the photo)</label>
+            <div class="idrow"><input type="text" id="tag" maxlength="40" list="recentTags" autocomplete="off" placeholder="BA-C-261027-K4Q"><button type="button" class="small" id="newTag">New</button></div>
+            <datalist id="recentTags"></datalist>
+          </div>
+          <div class="field"><label for="takenAt">Taken at</label><input type="datetime-local" id="takenAt"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="place">Market, farm or lab</label><input type="text" id="place" maxlength="80"></div>
+          <div class="field"><label for="town">Town</label><input type="text" id="town" maxlength="80"></div>
+          <div class="field"><label for="phone">Phone model</label><input type="text" id="phone" maxlength="60"></div>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="card-step" id="gradingBox">
+      <fieldset>
+        <legend><span class="step-no">5</span>Grading</legend>
+        <div class="field" id="ripeG"><span class="lbl" style="font-size:.95rem">Ripeness stage</span><div class="ripeness" id="ripenessG"></div></div>
+        <div class="row">
+          <div class="field"><label for="grade">Grade</label>
+            <select id="grade"><option value="">Choose</option><option value="A">A: top quality</option><option value="B">B: minor defects</option><option value="C">C: many defects</option><option value="reject">Reject</option><option value="unsure">Not sure</option></select>
+          </div>
+          <div class="field" id="damagedField"><label for="damaged">Damaged seeds (%)</label><input type="number" id="damaged" min="0" max="100" inputmode="numeric"></div>
+        </div>
+        <div class="field"><span class="lbl" style="font-size:.95rem">Defects</span><div class="chips" id="defects"></div></div>
+      </fieldset>
+    </div>
+
+    <div class="card-step" id="chemBox" hidden>
+      <fieldset>
+        <legend><span class="step-no">5</span>Chemical treatment</legend>
+        <div class="field"><label for="treatment" id="treatLabel">Treatment</label><select id="treatment"></select>
+          <p class="hint">Choose "Known" only for batches you ran or watched, or that a lab confirmed.</p></div>
+        <div class="row">
+          <div class="field"><label for="hours">Hours since treatment or start</label><input type="number" id="hours" min="0" step="1" inputmode="numeric"></div>
+          <div class="field"><label for="lab">Lab result or reference</label><input type="text" id="lab" maxlength="200"></div>
+        </div>
+        <div class="field" id="ripeC"><span class="lbl" style="font-size:.95rem">Ripeness stage</span><div class="ripeness" id="ripenessC"></div></div>
+        <div class="field"><span class="lbl" style="font-size:.95rem">Signs noticed</span><div class="chips" id="signs"></div></div>
+      </fieldset>
+    </div>
+
+    <div class="card-step">
+      <div class="field"><label for="notes">Notes</label><textarea id="notes" maxlength="1000"></textarea></div>
+      <label class="consent" for="consent"><input type="checkbox" id="consent"><span>These photos were taken with permission, show no faces, and may be published in the open dataset.</span></label>
+      <button type="submit" class="primary big" id="submitBtn">Upload sample</button>
+      <div class="progress" id="progress" hidden><i id="bar"></i></div>
+      <div class="status-line" id="status" role="status" aria-live="polite"></div>
+    </div>
+  </form>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/auth.js"></script>
+<script>
+(function () {
+  "use strict";
+  var RG = window.RG, $ = RG.$, el = RG.el, me = null;
+  var CODE = { beans: "BN", banana: "BA", plantain: "PL", pawpaw: "PW" };
+
+  RG.CROPS.forEach(function (c, i) {
+    var inp = el("input", { type: "radio", name: "crop", value: c[0], id: "crop-" + c[0] });
+    if (i === 0) inp.checked = true;
+    $("cropTiles").appendChild(el("label", { for: "crop-" + c[0] }, [inp, el("span", { text: c[1] })]));
+  });
+  RG.buildRipeness($("ripenessG"), "stageG");
+  RG.buildRipeness($("ripenessC"), "stageC");
+  var picker = RG.photoPicker({ box: $("thumbs"), inputs: [$("camIn"), $("galIn")], max: 8, views: function () { return RG.VIEWS[RG.radio("crop")]; } });
+
+  function refresh() {
+    var project = RG.radio("project"), c = RG.radio("crop"), fruit = c !== "beans";
+    $("gradingBox").hidden = project !== "grading";
+    $("chemBox").hidden = project !== "chemical";
+    $("ripeG").hidden = !fruit; $("ripeC").hidden = !fruit; $("damagedField").hidden = fruit;
+    RG.buildChips($("defects"), fruit ? RG.DEFECTS.fruit : RG.DEFECTS.beans, "def");
+    RG.buildChips($("signs"), fruit ? RG.SIGNS.fruit : RG.SIGNS.beans, "sig");
+    var t = $("treatment"); t.innerHTML = "";
+    t.appendChild(el("option", { value: "", text: "Choose" }));
+    (fruit ? RG.TREATMENTS.fruit : RG.TREATMENTS.beans).forEach(function (o) { t.appendChild(el("option", { value: o[0], text: o[1] })); });
+    $("treatLabel").textContent = fruit ? "How was it ripened?" : "Was it treated with a preservative?";
+    picker.render();
+  }
+  document.querySelectorAll('input[name="project"], input[name="crop"]').forEach(function (r) { r.addEventListener("change", refresh); });
+  refresh();
+
+  ["place", "town", "phone"].forEach(function (k) { var v = RG.store("rgt-" + k); if (v) $(k).value = v; });
+  $("takenAt").value = RG.localNow();
+  $("newTag").addEventListener("click", function () {
+    var d = new Date(), s = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", r = "";
+    for (var i = 0; i < 3; i++) r += s[Math.floor(Math.random() * s.length)];
+    $("tag").value = CODE[RG.radio("crop")] + "-" + (RG.radio("project") === "grading" ? "G" : "C") + "-" + String(d.getFullYear()).slice(2) + RG.pad(d.getMonth() + 1) + RG.pad(d.getDate()) + "-" + r;
+  });
+
+  function loadTags() {
+    RG.sb.from("samples").select("sample_tag").eq("submitted_by", me.user.id).not("sample_tag", "is", null).order("created_at", { ascending: false }).limit(50).then(function (r) {
+      if (r.error) return;
+      var dl = $("recentTags"), seen = {}; dl.innerHTML = "";
+      r.data.forEach(function (row) { if (!seen[row.sample_tag]) { seen[row.sample_tag] = 1; dl.appendChild(el("option", { value: row.sample_tag })); } });
+    });
+  }
+
+  RG.requireTeam($("auth"), function (info) {
+    me = info; $("form").hidden = false;
+    $("reviewLink").hidden = info.role !== "admin";
+    loadTags();
+  });
+
+  var busy = false;
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (busy || !me) return;
+    var st = $("status"), project = RG.radio("project"), c = RG.radio("crop"), fruit = c !== "beans";
+    var tag = $("tag").value.trim().toUpperCase();
+    if (!picker.photos.length) { st.textContent = "Add at least one photo."; return; }
+    if (!tag) { st.textContent = "Add a sample tag, or tap New."; $("tag").focus(); return; }
+    if (project === "chemical" && !$("treatment").value) { st.textContent = "Choose the treatment, or Unknown."; $("treatment").focus(); return; }
+    if (!$("consent").checked) { st.textContent = "Tick the consent box."; return; }
+
+    busy = true; $("submitBtn").disabled = true; $("progress").hidden = false;
+    RG.uploadPhotos(picker.photos, "trusted", function (d, t) { $("bar").style.width = Math.round(d / t * 90) + "%"; st.textContent = "Uploaded " + d + " of " + t + " photos…"; })
+    .then(function (photos) {
+      var takenRaw = $("takenAt").value, row = {
+        source: "trusted", project: project, crop: c, photos: photos, sample_tag: tag,
+        taken_at: takenRaw ? new Date(takenRaw).toISOString() : null,
+        place: $("place").value.trim() || null, town: $("town").value.trim() || null, phone_model: $("phone").value.trim() || null,
+        notes: $("notes").value.trim() || null, consent: true, submitted_by: me.user.id, device_id: RG.deviceId()
+      };
+      if (project === "grading") {
+        row.grade = $("grade").value || null;
+        row.defects = RG.checked($("defects"));
+        if (fruit) row.ripeness = RG.radio("stageG") ? Number(RG.radio("stageG")) : null;
+        else { var d = $("damaged").value; row.damaged_pct = d === "" ? null : Math.max(0, Math.min(100, Math.round(Number(d)))); }
+      } else {
+        row.treatment = $("treatment").value;
+        var h = $("hours").value; row.hours_since_start = h === "" ? null : Number(h);
+        row.lab_result = $("lab").value.trim() || null;
+        row.signs = RG.checked($("signs"));
+        if (fruit) row.ripeness = RG.radio("stageC") ? Number(RG.radio("stageC")) : null;
+      }
+      st.textContent = "Saving…";
+      return RG.sb.from("samples").insert(row).then(function (r) { if (r.error) throw r.error; return photos.length; });
+    }).then(function (n) {
+      ["place", "town", "phone"].forEach(function (k) { RG.store("rgt-" + k, $(k).value.trim()); });
+      picker.clear(); $("notes").value = ""; $("consent").checked = false; $("takenAt").value = RG.localNow();
+      $("bar").style.width = "100%"; st.textContent = "";
+      var dn = $("doneNote"); dn.hidden = false;
+      dn.textContent = "Saved sample " + tag + " with " + n + (n === 1 ? " photo." : " photos.") + " For the next check-in of the same batch, keep the same tag.";
+      loadTags(); window.scrollTo({ top: 0, behavior: "smooth" });
+    }).catch(function (err) { st.textContent = RG.errorText(err); })
+    .then(function () { busy = false; $("submitBtn").disabled = false; setTimeout(function () { $("progress").hidden = true; $("bar").style.width = "0"; }, 600); });
+  });
+})();
+</script>
+</body>
+</html>
