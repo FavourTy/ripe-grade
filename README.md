@@ -1,130 +1,131 @@
 # ProductLens
 
-A public website where anyone can upload photos of **beans, banana, plantain and pawpaw** for an open computer-vision dataset, plus private pages for your team to upload lab-verified samples and review everything.
+A website for building an open photo dataset of Nigerian produce (**beans, banana, plantain and pawpaw**) for computer vision research on quality grading and chemical ripening.
 
-**Where things live**
-- **Photos:** Cloudinary (free plan: 25 credits a month; 1 credit = 1 GB storage, 1 GB bandwidth or 1,000 transformations).
-- **Labels, team and sign-in:** Supabase (free plan).
-- **Website:** Vercel (free plan).
-
-| Page | Who uses it | What it does |
-| --- | --- | --- |
-| `index.html` | Anyone with the link | Snap 1–4 photos, tap produce, ripeness, problems, where it came from, what the seller said. No login. |
-| `trusted.html` | You and lab partners (email sign-in) | Full form: sample tag, grade, known treatment, hours since start, lab result. |
-| `review.html` | Admins only | See photos, approve or reject, set the final label, delete, export CSV. |
-| `api/delete-sample.js` | Runs on Vercel | Deletes a sample's photos and row; checks you're an admin first. |
-| `scripts/download_dataset.py` | You, on your computer | Downloads approved photos and a labels CSV for training. |
+- **Photos** are stored in Cloudinary (folder `productlens`).
+- **Labels, team accounts and sign-in** are in Supabase.
+- **The website** is hosted on Vercel and updates automatically when you push to GitHub.
 
 ---
 
-## Setup
+## The pages
 
-### 1. Supabase (database and sign-in)
-1. Create a project at https://supabase.com.
-2. **SQL Editor > New query**: paste all of `supabase/setup.sql`, then **Run**.
-   - If it stops with an error about `photos_cloudinary`, you have old test rows. Run `delete from public.samples;`, then run the file again.
-3. **Project Settings > API**: copy the **API URL** and the **anon** key (on the **Legacy API Keys** tab if you see "Publishable" keys).
+| Page | Address | Who |
+| --- | --- | --- |
+| Public upload | `/` | Anyone with the link. No login. |
+| Team upload | `/trusted.html` | Admins and trusted lab partners (email sign-in) |
+| Review | `/review.html` | Admins only |
 
-### 2. Cloudinary (photos)
-1. Sign up at https://cloudinary.com (free plan).
-2. On the dashboard home, copy your **Cloud name**.
-3. Create the upload preset: **Settings** (gear icon) > **Upload** > **Upload presets** > **Add upload preset**.
-   - **Preset name:** `productlens_unsigned`
-   - **Signing mode:** **Unsigned**
-   - **Asset folder** (or **Folder**): `productlens`
-   - **Use filename / Unique filename:** leave the defaults so every photo gets a new random name. **Overwrite:** off.
-   - **Upload control / Upload manipulations** (names vary in the Cloudinary UI):
-     - **Allowed formats:** `jpg,png,webp`
-     - **Incoming transformation:** `c_limit,w_1600,h_1600,q_auto:good` (shrinks large photos on arrival to save space)
-   - **Save.**
-4. Get the API key and secret for deleting: **Settings > API Keys**. Copy the **API Key** and **API Secret**. These go into Vercel only (step 4), never into `config.js` or GitHub.
+### Public upload (for students and helpers)
+1. Take or choose 1–4 photos of **one** sample.
+2. Tap what it is, how ripe it looks, any problems, and where it came from.
+3. Say what the seller claimed about ripening or chemicals (or "didn't say").
+4. Optionally add a town and a nickname (nicknames appear on the Top helpers list).
+5. Tick the consent box and upload.
 
-### 3. Fill in `config.js`
-```js
-SUPABASE_URL: "https://abcd1234.supabase.co",
-SUPABASE_ANON_KEY: "eyJ...",
-CLOUDINARY_CLOUD_NAME: "your-cloud-name",
-CLOUDINARY_UPLOAD_PRESET: "productlens_unsigned",
+The public form only asks what people can **see**. What the seller said is stored as a hint, never as the truth.
+
+### Team upload (for you and lab partners)
+Use this for samples where the true label is known: controlled ripening batches, lab-tested beans and expert-graded trays.
+- **Sorting & grading:** grade, ripeness, defects, % damaged seeds.
+- **Chemical:** known treatment (natural, carbide, preservative or unknown), hours since treatment, lab result.
+- Give every sample a **sample tag** (tap **New**), write it on paper in the first photo, and reuse the same tag for later check-ins of the same batch.
+
+### Review (admins)
+- Filter by status (waiting, approved, rejected), source (crowd or trusted) and produce.
+- Click a photo to open it full size.
+- Set the **final label**, add a note, then **Approve** or **Reject**. Only approved samples go into the training dataset.
+- **Delete** appears on rejected samples (tap twice). It removes the photos from Cloudinary and the row from Supabase. Delete only works on the live site.
+- **Export CSV** downloads every sample's labels and photo links.
+
+---
+
+## Photo guidelines (share these with helpers)
+- Plain white or light background: a plate, tray, paper or white cloth.
+- Daylight or shade. No flash or yellow bulbs.
+- **Beans:** one layer on a tray, photographed straight down.
+- **Fruit:** side view, top view, and a close-up of the stalk or stem.
+- One sample per upload. No faces in the photos.
+
+---
+
+## Managing the team
+
+People must sign in once on `/trusted.html` before you can add them. Then run this in Supabase **SQL Editor**:
+
+```sql
+-- role: 'admin' (can review) or 'trusted' (can upload full samples, cannot review)
+insert into public.team (user_id, role, email)
+select id, 'trusted', email from auth.users where email = 'their-email@example.com'
+on conflict (user_id) do update set role = excluded.role;
 ```
 
-### 4. Deploy on Vercel
-1. Push the folder to GitHub (VS Code: Source Control > Publish to GitHub).
-2. On https://vercel.com: **Add New > Project**, import the repo. **Framework Preset:** Other. No build command.
-3. Before or after the first deploy, open **Project > Settings > Environment Variables** and add these five (for Production, Preview and Development):
-
-   | Name | Value |
-   | --- | --- |
-   | `SUPABASE_URL` | same as in config.js |
-   | `SUPABASE_ANON_KEY` | same as in config.js |
-   | `CLOUDINARY_CLOUD_NAME` | your cloud name |
-   | `CLOUDINARY_API_KEY` | from Cloudinary Settings > API Keys |
-   | `CLOUDINARY_API_SECRET` | from Cloudinary Settings > API Keys |
-
-4. **Redeploy** (Deployments > ... > Redeploy) so the function picks up the variables.
-
-### 5. Supabase sign-in links
-**Authentication > URL Configuration**:
-- **Site URL:** `https://YOUR-SITE.vercel.app`
-- **Redirect URLs:** `https://YOUR-SITE.vercel.app/*` and `http://127.0.0.1:5500/*` (for Live Server)
-
-### 6. Make yourself admin
-1. Open `https://YOUR-SITE.vercel.app/trusted.html`, sign in with the email link.
-2. In Supabase **SQL Editor**, run:
-   ```sql
-   insert into public.team (user_id, role, email)
-   select id, 'admin', email from auth.users where email = 'you@example.com'
-   on conflict (user_id) do update set role = excluded.role;
-   ```
-3. Reload `trusted.html`; you'll see the **Review** link. For a lab partner, use `'trusted'` instead of `'admin'`.
-
-### 7. Test
-1. Upload one sample from your phone on the public page.
-2. Check it appears in Cloudinary **Media Library** (folder `productlens`) and in Supabase **Table Editor > samples**.
-3. On `review.html`, approve it, export CSV, then try deleting a rejected test sample.
+To remove someone: `delete from public.team where email = 'their-email@example.com';`
 
 ---
-
-## Local testing (VS Code Live Server)
-Uploads, sign-in and review all work on Live Server. **Delete** only works on the deployed Vercel site, because it needs the server function. (To run functions locally, install the Vercel CLI and run `vercel dev`.)
 
 ## Downloading the dataset for training
+
 ```bash
 pip install supabase
-SUPABASE_URL=https://xxxx.supabase.co SUPABASE_SERVICE_KEY=service-role-key CLOUDINARY_CLOUD_NAME=your-cloud python scripts/download_dataset.py
+SUPABASE_URL=https://jesgenigfvtkznjpkhvo.supabase.co \
+SUPABASE_SERVICE_KEY=your-service-role-key \
+CLOUDINARY_CLOUD_NAME=ik4jsjvl \
+python scripts/download_dataset.py
 ```
-Creates `dataset/images/<crop>/...` and `dataset/samples.csv` with **approved** samples only (`STATUS=all` for everything). It skips photos you already have. Each download uses Cloudinary bandwidth credits, so don't re-download everything often.
+
+- Creates `dataset/images/<crop>/` and `dataset/samples.csv` (one row per photo).
+- Includes **approved** samples only. Add `STATUS=all` to get everything.
+- Skips photos already downloaded. Downloads use Cloudinary credits, so don't re-download everything often.
+- The service_role key is in Supabase > Project Settings > API Keys. Keep it on your laptop only.
 
 ---
 
-## Limits and costs to watch
-- **Cloudinary credits** are shared each month between storage, bandwidth and transformations. Storage keeps counting every month, so 20 GB stored leaves about 5 credits for viewing and downloading. Check **Dashboard > Usage** weekly during campaigns.
-- **Photo size:** phones shrink photos to 1600 px before upload (about 200–400 KB each), and the preset's incoming transformation enforces it. 20 GB holds roughly 50,000+ photos.
-- **Supabase free projects pause** after a week without activity. Open the dashboard and click Restore if the site stops working.
-- **Sign-in emails** from Supabase are limited to a few per hour on the free plan.
+## Making changes
 
-## Security notes
-- `config.js` values are public by design. The **Cloudinary API secret** and **Supabase service_role key** must never be in the website or GitHub.
-- The upload preset lets anyone with the site upload images to your Cloudinary folder. Review regularly and delete junk.
-- Photo links are public but random and unguessable. Delete anything with a face or personal details.
-- **Optional hardening:** in Cloudinary **Settings > Security**, turn on **Strict transformations** and allow `c_fill,w_400,h_400,q_auto,f_auto` (the review thumbnail). This stops strangers from burning your credits with custom image sizes.
-- The database only accepts photo records that are Cloudinary IDs, so nobody can save links to outside images.
+- **Edit and test locally:** open the folder in VS Code and use **Live Server** on `index.html`. Uploads and review work; delete does not.
+- **Publish:** commit and Sync in VS Code. Vercel redeploys in about a minute.
+- **Change labels or options** (defects, ripeness stages, sources): edit the lists at the top of `assets/common.js`.
+- **Add a new produce type:** add it in `assets/common.js` **and** to the `crop` check in `supabase/setup.sql`, then run that SQL again.
 
-## Privacy (Nigeria Data Protection Act 2023)
-- Consent is an unticked box people must tick for every upload.
-- Only a town and an optional nickname are collected.
-- Remove any photo showing a face before publishing the dataset. Credit contributors by nickname and choose an open licence (for example CC BY 4.0).
+---
+
+## Settings reference
+
+| Where | Value |
+| --- | --- |
+| `config.js` | Supabase URL and anon key, Cloudinary cloud name, upload preset `productlens_unsigned` (all public by design) |
+| Vercel > Settings > Environment Variables | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (secret) |
+| Cloudinary > Settings > Upload Presets | `productlens_unsigned`: Unsigned, folder `productlens`, incoming transformation `c_limit,w_1600,h_1600,q_auto:good` |
+| Supabase > Authentication > URL Configuration | Site URL and Redirect URLs set to the live address (plus `http://127.0.0.1:5500/*` for Live Server) |
+| Supabase > SQL Editor | `supabase/setup.sql` (safe to run again) |
+
+**Never** put the Cloudinary API Secret or the Supabase service_role key in `config.js` or GitHub.
+
+---
+
+## Keeping it running
+
+- **Cloudinary credits:** 25 a month on the free plan, shared between storage, bandwidth and thumbnails. Check **Dashboard > Usage** weekly during campaigns.
+- **Supabase pauses** free projects after a week without activity. If the site stops working, open the Supabase dashboard and click **Restore**.
+- **Sign-in emails** are limited to a few per hour on Supabase's free plan. If an email doesn't arrive, wait and try again.
+- **Review weekly** so junk and photos with faces don't pile up.
+
+## Privacy
+- Consent is required for every upload. Only a town and an optional nickname are collected.
+- Delete any photo showing a face. When publishing the dataset, credit contributors by nickname and use an open licence (for example CC BY 4.0).
+
+---
 
 ## Files
+
 ```
-index.html                    public upload page
-trusted.html                  team upload (sign-in)
-review.html                   admin review + CSV export
-config.js                     Supabase + Cloudinary public settings
-api/delete-sample.js          Vercel function: admin-only delete
-assets/style.css              design
-assets/common.js              shared code (resize, Cloudinary upload, labels)
-assets/auth.js                email sign-in for team pages
-supabase/setup.sql            tables and security rules
+index.html                    public upload
+trusted.html                  team upload
+review.html                   admin review and export
+config.js                     public settings
+api/delete-sample.js          admin-only delete (runs on Vercel)
+assets/                       styles and shared code
+supabase/setup.sql            database tables and security rules
 scripts/download_dataset.py   download approved data for training
-.gitignore                    keeps the dataset and secrets out of GitHub
 ```
