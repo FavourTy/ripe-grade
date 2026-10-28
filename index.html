@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ripe &amp; Grade: Share Produce Photos</title>
+<title>ProductLens: Share Produce Photos</title>
 <meta name="description" content="Help build Nigeria's first open photo dataset of beans, banana, plantain and pawpaw. Snap a photo, tap a few answers, done.">
 <meta name="theme-color" content="#2C6B3C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,7 +13,7 @@
 <body>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Ripe &amp; Grade</h1></a>
+    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>ProductLens</h1></a>
     <nav class="toplinks"><a href="#leaderboard">Top helpers</a><a href="#how">How to shoot</a></nav>
   </div>
 </header>
@@ -116,7 +116,7 @@
 </main>
 
 <footer class="foot">
-  <div class="wrap">Photos are stored privately and reviewed before release. Locations are kept at town level. Research team: <a href="trusted.html">team sign-in</a>.</div>
+  <div class="wrap">Photos are reviewed before release and unsuitable ones are deleted. Locations are kept at town level. Research team: <a href="trusted.html">team sign-in</a>.</div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -195,7 +195,7 @@
     busy = true; $("submitBtn").disabled = true; $("progress").hidden = false; $("bar").style.width = "4%";
     st.textContent = "Uploading photos…";
     var defects = RG.checked($("defects")).filter(function (d) { return d !== "None I can see"; });
-    RG.uploadPhotos(picker.photos, "crowd", function (done, total) {
+    RG.uploadPhotos(picker.photos, "crowd", c, function (done, total) {
       $("bar").style.width = Math.round(done / total * 90) + "%";
       st.textContent = "Uploaded " + done + " of " + total + " photos…";
     }).then(function (photos) {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ripe &amp; Grade: Review</title>
+<title>ProductLens: Review</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#2C6B3C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,7 +13,7 @@
 <body>
 <header class="top">
   <div class="wrap wide">
-    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Ripe &amp; Grade</h1></a>
+    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>ProductLens</h1></a>
     <nav class="toplinks"><a href="./">Public page</a><a href="trusted.html">Team upload</a></nav>
   </div>
 </header>
@@ -71,23 +71,18 @@
       total = r.count || 0; offset += r.data.length;
       $("count").textContent = total + (total === 1 ? " sample" : " samples");
       if (first && !r.data.length) $("cards").appendChild(el("div", { class: "empty", text: "No samples match these filters." }));
-      var paths = [];
-      r.data.forEach(function (s) { (s.photos || []).slice(0, 4).forEach(function (p) { paths.push(p.path); }); });
-      var urls = {};
-      var getUrls = paths.length ? RG.sb.storage.from(RG.BUCKET).createSignedUrls(paths, 3600).then(function (u) {
-        (u.data || []).forEach(function (x) { if (x.signedUrl) urls[x.path] = x.signedUrl; });
-      }) : Promise.resolve();
-      getUrls.then(function () { r.data.forEach(function (s) { $("cards").appendChild(card(s, urls)); }); });
+      r.data.forEach(function (s) { $("cards").appendChild(card(s)); });
       $("moreBtn").hidden = offset >= total;
     });
   }
 
-  function card(s, urls) {
+  function card(s) {
     var pics = el("div", { class: "pics" });
     (s.photos || []).slice(0, 4).forEach(function (p) {
-      var u = urls[p.path];
-      if (!u) { pics.appendChild(el("div", { class: "ph" })); return; }
-      pics.appendChild(el("a", { href: u, target: "_blank", rel: "noopener", title: p.view || "" }, [el("img", { src: u, alt: p.view || "Photo", loading: "lazy" })]));
+      if (!p || !p.public_id) { pics.appendChild(el("div", { class: "ph" })); return; }
+      var img = el("img", { src: RG.thumbUrl(p), alt: p.view || "Photo", loading: "lazy" });
+      img.addEventListener("error", function () { img.replaceWith(el("div", { class: "ph" })); });
+      pics.appendChild(el("a", { href: RG.photoUrl(p), target: "_blank", rel: "noopener", title: p.view || "" }, [img]));
     });
     if (!(s.photos || []).length) pics.appendChild(el("div", { class: "ph" }));
 
@@ -131,12 +126,22 @@
     var confirmDel = false;
     function del() {
       if (!confirmDel) { confirmDel = true; delBtn.textContent = "Tap again to delete for good"; setTimeout(function () { confirmDel = false; delBtn.textContent = "Delete"; }, 4000); return; }
-      setBusy(true);
-      var paths = (s.photos || []).map(function (p) { return p.path; });
-      (paths.length ? RG.sb.storage.from(RG.BUCKET).remove(paths) : Promise.resolve({}))
-        .then(function () { return RG.sb.from("samples").delete().eq("id", s.id); })
-        .then(function (r) { if (r && r.error) throw r.error; article.remove(); total--; $("count").textContent = total + " samples"; })
-        .catch(function (err) { setBusy(false); msg.textContent = RG.errorText(err); });
+      setBusy(true); msg.textContent = "Deleting…";
+      RG.sb.auth.getSession().then(function (r) {
+        var token = r.data && r.data.session && r.data.session.access_token;
+        if (!token) throw new Error("Please sign in again.");
+        return fetch("/api/delete-sample", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          body: JSON.stringify({ id: s.id })
+        });
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (j) {
+          if (res.status === 404 && !j.error) throw new Error("Delete only works on the live site (it needs the server function), not on Live Server.");
+          if (!res.ok) throw new Error(j.error || ("Delete failed (" + res.status + ")"));
+          article.remove(); total--; $("count").textContent = total + (total === 1 ? " sample" : " samples");
+        });
+      }).catch(function (err) { setBusy(false); msg.textContent = err.message || "Delete failed. Try again."; });
     }
     var approveBtn = el("button", { type: "button", class: "small primary", text: "Approve", onclick: function () { save("approved"); } });
     var rejectBtn = el("button", { type: "button", class: "small", text: "Reject", onclick: function () { save("rejected"); } });
@@ -177,13 +182,17 @@
       });
     }
     page().then(function () {
-      var lines = [cols.concat(["photo_paths", "photo_views"]).join(",")];
+      var lines = [cols.concat(["photo_urls", "photo_public_ids", "photo_views"]).join(",")];
       all.forEach(function (s) {
         var ph = s.photos || [];
-        lines.push(cols.map(function (c) { return csvCell(s[c]); }).concat([csvCell(ph.map(function (p) { return p.path; })), csvCell(ph.map(function (p) { return p.view || ""; }))]).join(","));
+        lines.push(cols.map(function (c) { return csvCell(s[c]); }).concat([
+          csvCell(ph.map(function (p) { return RG.photoUrl(p); })),
+          csvCell(ph.map(function (p) { return p.public_id; })),
+          csvCell(ph.map(function (p) { return p.view || ""; }))
+        ]).join(","));
       });
       var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
-      var d = new Date(), a = el("a", { href: URL.createObjectURL(blob), download: "ripe-grade-" + d.getFullYear() + RG.pad(d.getMonth() + 1) + RG.pad(d.getDate()) + ".csv" });
+      var d = new Date(), a = el("a", { href: URL.createObjectURL(blob), download: "productlens-" + d.getFullYear() + RG.pad(d.getMonth() + 1) + RG.pad(d.getDate()) + ".csv" });
       document.body.appendChild(a); a.click(); a.remove();
       es.textContent = all.length + " rows exported";
     }).catch(function (err) { es.textContent = RG.errorText(err); })

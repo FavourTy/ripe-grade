@@ -7,7 +7,7 @@ create table if not exists public.team (
 );
 alter table public.team enable row level security;
 
--- Returns the signed-in user's role, or null for everyone else.
+
 create or replace function public.my_role()
 returns text
 language sql stable security definer
@@ -30,7 +30,7 @@ create table if not exists public.samples (
   source text not null check (source in ('crowd', 'trusted')),
   project text check (project in ('grading', 'chemical')),          -- null for crowd uploads
   crop text not null check (crop in ('beans', 'banana', 'plantain', 'pawpaw')),
-  photos jsonb not null,                                             -- [{"path": "...", "view": "Side"}]
+  photos jsonb not null,                                             -- [{"public_id": "...", "version": 1, "format": "jpg", "view": "Side"}]
 
   -- What anyone can see
   ripeness smallint check (ripeness between 1 and 6),                -- fruit only
@@ -48,7 +48,7 @@ create table if not exists public.samples (
   sample_tag text,
   taken_at timestamptz,
 
-  -- Context
+
   place text,
   town text,
   phone_model text,
@@ -58,7 +58,7 @@ create table if not exists public.samples (
   consent boolean not null,
   submitted_by uuid default auth.uid(),
 
-  -- Review (admins only)
+ 
   review_status text not null default 'pending' check (review_status in ('pending', 'approved', 'rejected')),
   final_label text,
   review_note text,
@@ -72,11 +72,17 @@ create table if not exists public.samples (
     coalesce(length(phone_model), 0) <= 60 and coalesce(length(sample_tag), 0) <= 40
   )
 );
+
+alter table public.samples drop constraint if exists photos_cloudinary;
+alter table public.samples add constraint photos_cloudinary check (
+  not jsonb_path_exists(photos, '$[*] ? (!(@.public_id like_regex "^[A-Za-z0-9_/-]{1,200}$"))')
+  and not jsonb_path_exists(photos, '$[*] ? (exists(@.version) && !(@.version.type() == "number"))')
+  and not jsonb_path_exists(photos, '$[*] ? (exists(@.format) && !(@.format like_regex "^[a-z0-9]{2,5}$"))')
+);
 create index if not exists samples_created_idx on public.samples (created_at desc);
 create index if not exists samples_status_idx on public.samples (review_status);
 alter table public.samples enable row level security;
 
--- Anyone (no login) can add a crowd sample. They cannot set review fields or "known" treatment labels.
 drop policy if exists "samples: crowd insert" on public.samples;
 create policy "samples: crowd insert" on public.samples
   for insert to anon, authenticated
@@ -88,7 +94,7 @@ create policy "samples: crowd insert" on public.samples
     and submitted_by is not distinct from auth.uid()
   );
 
--- Team members (admin or trusted) can add full trusted samples.
+
 drop policy if exists "samples: trusted insert" on public.samples;
 create policy "samples: trusted insert" on public.samples
   for insert to authenticated
@@ -117,9 +123,7 @@ create policy "samples: admin delete" on public.samples
   for delete to authenticated
   using (public.my_role() = 'admin');
 
--- ============================================================
--- 3. Public numbers: leaderboard and totals (no private details exposed)
--- ============================================================
+
 create or replace function public.leaderboard()
 returns table (contributor text, uploads bigint)
 language sql stable security definer
@@ -151,31 +155,3 @@ $$;
 
 grant execute on function public.leaderboard() to anon, authenticated;
 grant execute on function public.public_stats() to anon, authenticated;
-
-
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('produce', 'produce', false, 4194304, array['image/jpeg', 'image/webp', 'image/png'])
-on conflict (id) do update
-  set public = false, file_size_limit = 4194304, allowed_mime_types = array['image/jpeg', 'image/webp', 'image/png'];
-
-drop policy if exists "produce: crowd upload" on storage.objects;
-create policy "produce: crowd upload" on storage.objects
-  for insert to anon, authenticated
-  with check (bucket_id = 'produce' and (storage.foldername(name))[1] = 'crowd');
-
-drop policy if exists "produce: trusted upload" on storage.objects;
-create policy "produce: trusted upload" on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'produce' and (storage.foldername(name))[1] = 'trusted'
-              and public.my_role() in ('admin', 'trusted'));
-
-drop policy if exists "produce: admin read" on storage.objects;
-create policy "produce: admin read" on storage.objects
-  for select to authenticated
-  using (bucket_id = 'produce' and public.my_role() = 'admin');
-
-drop policy if exists "produce: admin delete" on storage.objects;
-create policy "produce: admin delete" on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'produce' and public.my_role() = 'admin');
-

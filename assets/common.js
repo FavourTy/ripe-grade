@@ -1,14 +1,15 @@
-// Ripe & Grade: shared code for all pages.
+// ProductLens: shared code for all pages.
 (function () {
   "use strict";
   var cfg = window.RG_CONFIG || {};
-  var configured = cfg.SUPABASE_URL && cfg.SUPABASE_URL.indexOf("YOUR-PROJECT") < 0 &&
-                   cfg.SUPABASE_ANON_KEY && cfg.SUPABASE_ANON_KEY.indexOf("YOUR-") < 0;
+  function isSet(v) { return typeof v === "string" && v.length > 0 && v.indexOf("YOUR-") < 0; }
+  var configured = isSet(cfg.SUPABASE_URL) && isSet(cfg.SUPABASE_ANON_KEY) &&
+                   isSet(cfg.CLOUDINARY_CLOUD_NAME) && isSet(cfg.CLOUDINARY_UPLOAD_PRESET);
 
   var RG = {
     configured: configured,
+    cfg: cfg,
     sb: configured && window.supabase ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null,
-    BUCKET: "produce",
     MAX_PHOTOS: 8,
 
     RIPENESS: [
@@ -131,24 +132,49 @@
     });
   };
 
-  // Uploads photos [{file, view}] into folder ("crowd" or "trusted"). onProgress(done, total).
-  RG.uploadPhotos = function (photos, folder, onProgress) {
-    var d = new Date();
-    var day = d.getFullYear() + "-" + RG.pad(d.getMonth() + 1) + "-" + RG.pad(d.getDate());
+  // ---- Cloudinary ----
+  // Builds a delivery URL from a stored photo {public_id, version, format}. `tx` is an optional
+  // transformation such as "c_fill,w_400,h_400,q_auto,f_auto" for thumbnails.
+  RG.photoUrl = function (p, tx) {
+    if (!p || !p.public_id) return "";
+    var ver = /^\d+$/.test(String(p.version || "")) ? "v" + p.version + "/" : "";
+    var fmt = /^[a-z0-9]{2,5}$/.test(p.format || "") ? "." + p.format : "";
+    var id = String(p.public_id).split("/").map(encodeURIComponent).join("/");
+    return "https://res.cloudinary.com/" + encodeURIComponent(cfg.CLOUDINARY_CLOUD_NAME) + "/image/upload/" +
+      (tx ? tx + "/" : "") + ver + id + fmt;
+  };
+  RG.thumbUrl = function (p) { return RG.photoUrl(p, "c_fill,w_400,h_400,q_auto,f_auto"); };
+
+  function uploadOne(blob, tags) {
+    var fd = new FormData();
+    fd.append("file", blob, "photo.jpg");
+    fd.append("upload_preset", cfg.CLOUDINARY_UPLOAD_PRESET);
+    fd.append("tags", tags.join(","));
+    return fetch("https://api.cloudinary.com/v1_1/" + encodeURIComponent(cfg.CLOUDINARY_CLOUD_NAME) + "/image/upload", {
+      method: "POST", body: fd
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (j) {
+        if (!res.ok || !j.public_id) {
+          var e = new Error((j.error && j.error.message) || ("Upload failed (" + res.status + ")"));
+          e.code = "cloudinary"; e.status = res.status; throw e;
+        }
+        return j;
+      });
+    });
+  }
+
+  // Uploads photos [{file, view}] to Cloudinary, tagged with source ("crowd" or "trusted") and crop.
+  // Resolves to [{public_id, version, format, view, w, h, bytes}] for saving in the database.
+  RG.uploadPhotos = function (photos, source, crop, onProgress) {
     var out = [], i = 0;
+    var tags = ["productlens", source, crop].filter(Boolean);
     function next() {
       if (i >= photos.length) return Promise.resolve(out);
       var p = photos[i];
-      return RG.resize(p.file).then(function (r) {
-        var ext = r.blob.type === "image/png" ? "png" : r.blob.type === "image/webp" ? "webp" : "jpg";
-        var path = folder + "/" + day + "/" + RG.uuid() + "." + ext;
-        return RG.sb.storage.from(RG.BUCKET).upload(path, r.blob, { contentType: r.blob.type || "image/jpeg", upsert: false })
-          .then(function (res) {
-            if (res.error) { var e = new Error(res.error.message); e.code = "upload"; throw e; }
-            out.push({ path: path, view: p.view || null, w: r.w, h: r.h });
-            i++; if (onProgress) onProgress(i, photos.length);
-            return next();
-          });
+      return RG.resize(p.file).then(function (r) { return uploadOne(r.blob, tags); }).then(function (j) {
+        out.push({ public_id: j.public_id, version: j.version, format: j.format, view: p.view || null, w: j.width, h: j.height, bytes: j.bytes });
+        i++; if (onProgress) onProgress(i, photos.length);
+        return next();
       });
     }
     return next();
@@ -198,8 +224,11 @@
   RG.errorText = function (err) {
     var m = (err && (err.message || err.error_description)) || "";
     if (err && err.code === "unreadable") return "One photo couldn't be read. On iPhone, set Camera > Formats to Most Compatible, or choose a JPG.";
-    if (/payload too large|exceeded the maximum allowed size|413/i.test(m)) return "One photo is too large. Take it again or choose a smaller photo.";
-    if (/mime type|not supported/i.test(m)) return "That file type isn't supported. Use a JPG or PNG photo.";
+    if (/payload too large|exceeded the maximum allowed size|too large|413/i.test(m)) return "One photo is too large. Take it again or choose a smaller photo.";
+    if (/mime type|not supported|not allowed|invalid image/i.test(m)) return "That file type isn't supported. Use a JPG or PNG photo.";
+    if (/upload preset|preset not found|unsigned/i.test(m)) return "Photo uploads aren't set up correctly yet (upload preset). Please tell the project owner.";
+    if (/limit|quota|credits/i.test(m)) return "The photo storage is full for this month. Please tell the project owner.";
+    if (/photos_cloudinary/i.test(m)) return "The photos didn't upload properly. Please try again.";
     if (/row-level security|violates|permission|not authorized|JWT/i.test(m)) return "You don't have permission to do that. Sign in again, or ask the project owner to add you.";
     if (/Failed to fetch|NetworkError|network/i.test(m)) return "No connection. Check your data or Wi-Fi and try again.";
     return "Something went wrong: " + (m || "unknown error") + ". Try again.";
@@ -208,7 +237,7 @@
   RG.notConfiguredNote = function (box) {
     box.hidden = false;
     box.className = "notice warn";
-    box.textContent = "This site isn't connected to its database yet. The owner needs to add the Supabase URL and anon key in config.js.";
+    box.textContent = "This site isn't connected yet. The owner needs to add the Supabase and Cloudinary values in config.js.";
   };
 
   window.RG = RG;

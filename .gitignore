@@ -1,0 +1,8 @@
+# Downloaded dataset and local secrets: never push these to GitHub
+dataset/
+.env
+.env.*
+.vercel/
+node_modules/
+__pycache__/
+.DS_Store

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ripe &amp; Grade: Team Upload</title>
+<title>ProductLens: Team Upload</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#2C6B3C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,7 +13,7 @@
 <body>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Ripe &amp; Grade</h1></a>
+    <a class="brand" href="./"><span class="scale-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>ProductLens</h1></a>
     <nav class="toplinks"><a href="./">Public page</a><a href="review.html" id="reviewLink" hidden>Review</a></nav>
   </div>
 </header>
@@ -180,7 +180,7 @@
     if (!$("consent").checked) { st.textContent = "Tick the consent box."; return; }
 
     busy = true; $("submitBtn").disabled = true; $("progress").hidden = false;
-    RG.uploadPhotos(picker.photos, "trusted", function (d, t) { $("bar").style.width = Math.round(d / t * 90) + "%"; st.textContent = "Uploaded " + d + " of " + t + " photos…"; })
+    RG.uploadPhotos(picker.photos, "trusted", c, function (d, t) { $("bar").style.width = Math.round(d / t * 90) + "%"; st.textContent = "Uploaded " + d + " of " + t + " photos…"; })
     .then(function (photos) {
       var takenRaw = $("takenAt").value, row = {
         source: "trusted", project: project, crop: c, photos: photos, sample_tag: tag,

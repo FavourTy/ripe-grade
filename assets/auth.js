@@ -1,4 +1,4 @@
-// Ripe & Grade: shared sign-in for team pages (trusted.html, review.html).
+// ProductLens: shared sign-in for team pages (trusted.html, review.html).
 // Uses Supabase email magic links: no passwords to manage.
 (function () {
   "use strict";
